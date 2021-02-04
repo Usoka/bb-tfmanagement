@@ -3,8 +3,11 @@ import discord
 import json
 import re
 import asyncio
+from os import path
+
 
 DATA_DIR = 'data/boombeach'
+MANAGEMENT_FILE = DATA_DIR+'/meta.json'
 TFDATA_FILE = DATA_DIR+'/tfdata.json'
 
 NICK_MAX_LENGTH = 32
@@ -13,16 +16,24 @@ CLEANUP_DELAY_S = 60
 
 AFFIRMATIVE_REGEX = r'^y(?:es?|eah|up)?\.?$'
 
+
 class TFManagement(commands.Cog):
 	"""Custom cog for TF management"""
 
 	def __init__(self, bot):
 		self.bot = bot
-		with open(TFDATA_FILE, 'r') as f:
-			self.tfdata = json.load(f)
-			self.levels = self.tfdata["level"]
-			self.tf_ranks = self.tfdata["tf_ranks"]
-			self.tfs = self.tfdata["tf"]
+		with open(MANAGEMENT_FILE, 'r') as f:
+			self.meta = json.load(f)
+			self.levels = self.meta["level"]
+			self.tf_ranks = self.meta["tf_ranks"]
+
+		if path.exists(TFDATA_FILE):
+			#load from file
+			with open(TFDATA_FILE, 'r') as f:
+				self.tfs = json.load(f)
+		else:
+			#default to empty dict
+			self.tfs = dict()
 
 
 	@commands.command()
@@ -31,6 +42,47 @@ class TFManagement(commands.Cog):
 		"""Returns a list of all TFs"""
 
 		await ctx.send('**Task Forces:**\n{}'.format('\n'.join(map(lambda tf: tf["name"], self.tfs.values()))))
+
+
+	@commands.command()
+	@commands.has_any_role(184854821537316865, 325093590378348544, 371112881808343044)
+	@commands.guild_only()
+	async def addtf(self, ctx, name, memberrole: discord.Role, leadrole: discord.Role, channel: discord.TextChannel):
+		"""Adds a TF for addmember and listtfs"""
+
+		newtf = {
+			"name": name,
+			"member_roles": [memberrole.id],
+			"lead_ranks": ["officer", "coleader", "leader"],
+			"lead_roles": [leadrole.id],
+			"channel": channel.id
+		}
+
+		shorthand = name.lower().replace(' ', '')
+		if shorthand in self.tfs:
+			await ctx.send('A TF with the same or similar name already exists. Would you like to replace it?')
+			resp = await self.bot.wait_for('message', timeout=MAX_WAIT_S, check=lambda m: (m.author == ctx.author and m.channel == ctx.channel))
+
+			if resp and re.match(AFFIRMATIVE_REGEX, resp.content.lower()):
+				msg = await ctx.send('Replacing {}...'.format(name))
+				self._addtf(newtf)
+				success = 'TF {} replaced.'.format(name)
+				try:
+					msg.edit(content=success)
+				except discord.Forbidden:
+					ctx.send(success)
+			return
+
+		self._addtf(newtf)
+		await ctx.send('Added TF {}.'.format(name))
+
+
+	def _addtf(self, tf):
+		shorthand = tf["name"].lower().replace(' ', '')
+		self.tfs[shorthand] = tf
+		with open(TFDATA_FILE, 'w') as f:
+			json.dump(self.tfs, f, indent='\t')
+
 
 
 	@commands.command()
@@ -65,8 +117,8 @@ class TFManagement(commands.Cog):
 		#Process rank
 		rank = rank.lower()
 		#Convert alias to actual
-		if rank in self.tfdata["rank_aliases"]:
-			rank = self.tfdata["rank_aliases"][rank]
+		if rank in self.meta["rank_aliases"]:
+			rank = self.meta["rank_aliases"][rank]
 
 		if rank not in self.tf_ranks:
 			await ctx.send('⚠ Unknown rank "{}". Rank must be one of: {}.'.format(rank, ', '.join(self.tf_ranks.keys())), delete_after=CLEANUP_DELAY_S)
@@ -95,7 +147,7 @@ class TFManagement(commands.Cog):
 				cleanup.append(resp)
 			if resp and re.match(AFFIRMATIVE_REGEX, resp.content.lower()):
 				cleanup.append(await ctx.send('Adding **{}** rank to **{}**.'.format(max_rank, user)))
-				channel = guild.get_channel(self.tfdata["approval_channel"])
+				channel = guild.get_channel(self.meta["approval_channel"])
 				if isinstance(channel, discord.TextChannel):
 					try:
 						await channel.send('User **{}** (id: {}) requested rank **{}** for TF **{}** be added to user **{}** (id: {}).'.format(ctx.author, ctx.author.id, rank, tf["name"], user, user.id))
@@ -111,7 +163,7 @@ class TFManagement(commands.Cog):
 		roles = []
 		#Get roles
 		roles += [guild.get_role(r) for r in tf["member_roles"]]
-		roles.append(guild.get_role(self.tfdata["tf_ranks"][rank]))
+		roles.append(guild.get_role(self.tf_ranks[rank]))
 		if rank in tf["lead_ranks"]:
 			roles += [guild.get_role(r) for r in tf["lead_roles"]]
 
