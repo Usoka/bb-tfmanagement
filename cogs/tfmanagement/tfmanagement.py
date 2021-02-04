@@ -86,17 +86,13 @@ class TFManagement(commands.Cog):
 
 
 	@commands.command()
+	@commands.has_any_role(325093590378348544, 184854821537316865, 184855557717491723, 184855754103062531)
 	@commands.guild_only()
 	async def addmember(self, ctx, user: discord.Member, tfname, rank):
 		"""Adds a given member to a given TF"""
 
 		#check author (invoking user's) permission level
 		level = max(self._getlevel(r.id) for r in ctx.author.roles)
-
-		if level <= 0:
-			await ctx.send('⚠ Insufficient permissions to use this command.', delete_after=CLEANUP_DELAY_S)
-			await ctx.message.delete(delay=CLEANUP_DELAY_S)
-			return
 
 		#Prevent changing own roles
 		if user.id == ctx.author.id:
