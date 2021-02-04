@@ -45,7 +45,7 @@ class TFManagement(commands.Cog):
 
 
 	@commands.command()
-	@commands.has_any_role(184854821537316865, 325093590378348544, 371112881808343044)
+	@commands.has_any_role(184854821537316865, 325093590378348544)
 	@commands.guild_only()
 	async def addtf(self, ctx, name, memberrole: discord.Role, leadrole: discord.Role, channel: discord.TextChannel):
 		"""Adds a TF for addmember and listtfs"""
