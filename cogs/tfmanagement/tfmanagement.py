@@ -7,7 +7,7 @@ from os import path
 
 
 DATA_DIR = 'data/boombeach'
-MANAGEMENT_FILE = DATA_DIR+'/meta.json'
+MANAGEMENT_FILE = DATA_DIR+'/tfroles.json'
 TFDATA_FILE = DATA_DIR+'/tfdata.json'
 
 NICK_MAX_LENGTH = 32
