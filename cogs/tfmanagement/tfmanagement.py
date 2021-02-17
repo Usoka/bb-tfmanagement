@@ -44,7 +44,7 @@ class TFManagement(commands.Cog):
 		await ctx.send('**Task Forces:**\n{}'.format('\n'.join(map(lambda tf: tf["name"], self.tfs.values()))))
 
 
-	@commands.command()
+	@commands.command(aliases=['createtf'])
 	@commands.has_any_role(184854821537316865, 325093590378348544)
 	@commands.guild_only()
 	async def addtf(self, ctx, name, memberrole: discord.Role, leadrole: discord.Role, channel: discord.TextChannel):
@@ -66,11 +66,11 @@ class TFManagement(commands.Cog):
 			if resp and re.match(AFFIRMATIVE_REGEX, resp.content.lower()):
 				msg = await ctx.send('Replacing {}...'.format(name))
 				self._addtf(newtf)
-				success = 'TF {} replaced.'.format(name)
+				success = 'Successfully replaced {}.'.format(name)
 				try:
-					msg.edit(content=success)
+					await msg.edit(content=success)
 				except discord.Forbidden:
-					ctx.send(success)
+					await ctx.send(success)
 			return
 
 		self._addtf(newtf)
@@ -82,6 +82,35 @@ class TFManagement(commands.Cog):
 		self.tfs[shorthand] = tf
 		with open(TFDATA_FILE, 'w') as f:
 			json.dump(self.tfs, f, indent='\t')
+
+	def _deltf(self, shorthand):
+		del self.tfs[shorthand]
+		with open(TFDATA_FILE, 'w') as f:
+			json.dump(self.tfs, f, indent='\t')
+
+
+	@commands.command(aliases=['deletetf', 'removetf'])
+	@commands.has_any_role(184854821537316865, 325093590378348544)
+	@commands.guild_only()
+	async def deltf(self, ctx, name):
+		"""Deletes a given TF from the list of TFs"""
+
+		shorthand = name.lower().replace(' ', '')
+		if shorthand in self.tfs:
+			await ctx.send('Are you sure you wish to delete {}?\n*Note: A TF can always be added back with `{}addtf`*'.format(name, ctx.prefix))
+			resp = await self.bot.wait_for('message', timeout=MAX_WAIT_S, check=lambda m: (m.author == ctx.author and m.channel == ctx.channel))
+
+			if resp and re.match(AFFIRMATIVE_REGEX, resp.content.lower()):
+				msg = await ctx.send('Deleting {}...'.format(name))
+				self._deltf(shorthand)
+				success = 'Successfully removed {}.'.format(name)
+				try:
+					await msg.edit(content=success)
+				except discord.Forbidden:
+					await ctx.send(success)
+		else:
+			await ctx.send('I can\'t seem to find that TF. Use `{}listtfs` to check all available TFs.'.format(ctx.prefix))
+
 
 
 
